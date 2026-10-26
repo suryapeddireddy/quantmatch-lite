@@ -1,9 +1,20 @@
-<!-- BEGIN:nextjs-agent-rules -->
+<!-- BEGIN:quantmatch-agent-rules -->
 
-## This is NOT the Next.js you know
+# QuantMatch-Lite Agent Rules
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+This workspace operates under a strict spec-driven agentic workflow. Read the relevant guide in `context/` before writing any code or modifying system logic. 
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+<!-- END:quantmatch-agent-rules -->
 
-<!-- END:nextjs-agent-rules -->
+## Application Building Context
+
+Read the following files in order before implementing or making any architectural decision:
+
+1. `context/project-overview.md` — product definition, goals, and matching engine scope
+2. `context/architecture-context.md` — system structure, storage model, and matching invariants
+3. `context/ui-context.md` — theme, colors, typography, and financial dashboard conventions
+4. `context/code-standards.md` — TypeScript rules, modular separation, and engine standards
+5. `context/ai-workflow-rules.md` — development workflow, scoping rules, and delivery approach
+6. `context/progress-tracker.md` — current phase, completed work, and next steps
+
+Update `context/progress-tracker.md` after each meaningful implementation change.
