@@ -1,7 +1,9 @@
 "use client";
 
 import { Activity, ArrowDownRight, ArrowUpRight, CircleHelp, Command, Layers3, Radio } from "lucide-react";
-import { useRef, useState } from "react";
+import { Pause, Play } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import DepthChart from "../components/DepthChart";
 import OrderBook from "../components/OrderBook";
 import OrderForm, { type OrderSubmission } from "../components/OrderForm";
 import TradeTicker, { type ExecutedTrade } from "../components/TradeTicker";
@@ -34,30 +36,15 @@ export default function Home() {
   const [book, setBook] = useState<OrderBookSnapshot>(() => engine.getOrderBook());
   const [trades, setTrades] = useState<ExecutedTrade[]>([]);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [simulationEnabled, setSimulationEnabled] = useState(false);
   const orderSequence = useRef(0);
   const bestBid = book.bids[0]?.price;
   const bestAsk = book.asks[0]?.price;
 
-  function submitOrder(order: OrderSubmission) {
-    orderSequence.current += 1;
-    const id = `user-order-${orderSequence.current}`;
+  const executeOrder = useCallback((request: OrderRequest) => {
     setOrderError(null);
 
     try {
-      const request: OrderRequest = order.type === "limit"
-        ? {
-            id,
-            side: order.side,
-            type: "limit",
-            price: order.price ?? 0,
-            quantity: order.quantity,
-          }
-        : {
-            id,
-            side: order.side,
-            type: "market",
-            quantity: order.quantity,
-          };
       const result = engine.submitOrder(request);
 
       if (result.length > 0) {
@@ -65,8 +52,8 @@ export default function Home() {
         setTrades((current) => [
           ...result.map((trade, index) => ({
             ...trade,
-            id: `${id}-fill-${index}`,
-            side: order.side,
+            id: `${request.id}-fill-${index}`,
+            side: request.side,
             timestamp: executedAt,
           })),
           ...current,
@@ -77,7 +64,57 @@ export default function Home() {
     } catch (error) {
       setOrderError(error instanceof Error ? error.message : "Unable to submit this order.");
     }
+  }, [engine]);
+
+  function submitOrder(order: OrderSubmission) {
+    orderSequence.current += 1;
+    const id = `user-order-${orderSequence.current}`;
+    const request: OrderRequest = order.type === "limit"
+      ? {
+          id,
+          side: order.side,
+          type: "limit",
+          price: order.price ?? 0,
+          quantity: order.quantity,
+        }
+      : {
+          id,
+          side: order.side,
+          type: "market",
+          quantity: order.quantity,
+        };
+    executeOrder(request);
   }
+
+  useEffect(() => {
+    if (!simulationEnabled) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      const currentBook = engine.getOrderBook();
+      const currentBestBid = currentBook.bids[0]?.price;
+      const currentBestAsk = currentBook.asks[0]?.price;
+      const midpoint = currentBestBid !== undefined && currentBestAsk !== undefined
+        ? (currentBestBid + currentBestAsk) / 2
+        : currentBestBid ?? currentBestAsk ?? 67420;
+      const side = Math.random() < 0.5 ? "buy" : "sell";
+      const quantity = Number((0.05 + Math.random() * 0.45).toFixed(4));
+      orderSequence.current += 1;
+      const id = `sim-order-${orderSequence.current}`;
+
+      if (Math.random() < 0.2) {
+        executeOrder({ id, side, type: "market", quantity });
+        return;
+      }
+
+      const offset = (Math.random() - 0.5) * 20;
+      const price = Math.max(0.01, Math.round((midpoint + offset) * 100) / 100);
+      executeOrder({ id, side, type: "limit", price, quantity });
+    }, 1200);
+
+    return () => window.clearInterval(intervalId);
+  }, [engine, executeOrder, simulationEnabled]);
 
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
@@ -139,7 +176,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex items-center gap-5 sm:pb-1">
+          <div className="flex flex-wrap items-center gap-3 sm:pb-1">
             <div className="hidden text-right sm:block">
               <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-muted)]">Best bid</p>
               <p className="mt-1 font-mono text-xs text-[var(--bid)]">{bestBid ? `$${bestBid.toLocaleString("en-US")}` : "--"}</p>
@@ -154,6 +191,18 @@ export default function Home() {
               <span className="text-[11px] font-medium text-[var(--text-secondary)]">Spot</span>
               <ArrowDownRight size={12} className="text-[var(--text-muted)]" aria-hidden="true" />
             </div>
+            <button
+              type="button"
+              aria-pressed={simulationEnabled}
+              onClick={() => setSimulationEnabled((enabled) => !enabled)}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-medium transition-colors ${simulationEnabled ? "border-[var(--bid)]/40 bg-[var(--bid-surface)] text-[var(--bid)]" : "border-[var(--line)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--surface-raised)]"}`}
+            >
+              {simulationEnabled
+                ? <Pause size={13} aria-hidden="true" />
+                : <Play size={13} aria-hidden="true" />}
+              Simulate Liquidity
+              <span className={`size-1.5 rounded-full ${simulationEnabled ? "bg-[var(--bid)]" : "bg-[var(--text-muted)]"}`} />
+            </button>
           </div>
         </section>
 
@@ -172,7 +221,10 @@ export default function Home() {
           </div>
 
           <div className="order-1 xl:order-2">
-            <OrderBook book={book} />
+            <div className="space-y-4">
+              <OrderBook book={book} />
+              <DepthChart book={book} />
+            </div>
           </div>
 
           <div className="order-3 xl:order-3">
